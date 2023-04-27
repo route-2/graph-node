@@ -238,6 +238,17 @@ impl EntityMod {
             }
         }
     }
+
+    fn visible(&self, at: BlockNumber) -> bool {
+        use EntityMod::*;
+
+        match self {
+            Insert { block, end, .. } | Overwrite { block, end, .. } => {
+                *block <= at && end.map(|end| at < end).unwrap_or(true)
+            }
+            Remove { block, .. } => *block <= at,
+        }
+    }
 }
 
 /// A list of entity changes grouped by the entity type
@@ -301,19 +312,25 @@ impl RowGroup {
         self.rows.iter().any(|row| row.is_clamp())
     }
 
-    pub fn last_op(&self, key: &EntityKey) -> Option<EntityOp<'_>> {
+    pub fn last_op(&self, key: &EntityKey, block: BlockNumber) -> Option<EntityOp<'_>> {
         self.rows
             .iter()
-            .rfind(|emod| emod.key() == key)
+            .rfind(|emod| emod.key() == key && emod.visible(block))
             .map(EntityOp::from)
     }
 
-    pub fn effective_ops(&self) -> impl Iterator<Item = EntityOp<'_>> {
+    pub fn effective_ops(&self, at: BlockNumber) -> impl Iterator<Item = EntityOp<'_>> {
         let mut seen = HashSet::new();
         self.rows
             .iter()
             .rev()
-            .filter(move |emod| seen.insert(emod.id()))
+            .filter(move |emod| {
+                if emod.visible(at) {
+                    seen.insert(emod.id())
+                } else {
+                    false
+                }
+            })
             .map(EntityOp::from)
     }
 
@@ -607,6 +624,8 @@ impl<'a> From<&'a EntityMod> for EntityOp<'a> {
 pub struct Batch {
     /// The last block for which this batch contains changes
     pub block_ptr: BlockPtr,
+    /// The first block for which this batch contains changes
+    pub first_block: BlockNumber,
     /// The firehose cursor corresponding to `block_ptr`
     pub firehose_cursor: FirehoseCursor,
     mods: Sheet,
@@ -646,8 +665,10 @@ impl Batch {
 
         let data_sources = DataSources::new(block_ptr.cheap_clone(), data_sources);
         let offchain_to_remove = DataSources::new(block_ptr.cheap_clone(), offchain_to_remove);
+        let first_block = block_ptr.number;
         Ok(Self {
             block_ptr,
+            first_block,
             firehose_cursor,
             mods,
             data_sources,
@@ -691,22 +712,30 @@ impl Batch {
     /// `entity_type` and `id` is going to write that entity, i.e., insert
     /// or overwrite it, or if it is going to remove it. If no change will
     /// be made to the entity, return `None`
-    pub fn last_op(&self, key: &EntityKey) -> Option<EntityOp<'_>> {
-        self.mods.group(&key.entity_type)?.last_op(key)
+    pub fn last_op(&self, key: &EntityKey, block: BlockNumber) -> Option<EntityOp<'_>> {
+        self.mods.group(&key.entity_type)?.last_op(key, block)
     }
 
-    pub fn effective_ops(&self, entity_type: &EntityType) -> impl Iterator<Item = EntityOp> {
+    pub fn effective_ops(
+        &self,
+        entity_type: &EntityType,
+        at: BlockNumber,
+    ) -> impl Iterator<Item = EntityOp> {
         self.mods
             .group(entity_type)
-            .map(|group| group.effective_ops())
+            .map(|group| group.effective_ops(at))
             .into_iter()
             .flatten()
     }
 
-    pub fn new_data_sources(&self) -> impl Iterator<Item = &StoredDynamicDataSource> {
+    pub fn new_data_sources(
+        &self,
+        at: BlockNumber,
+    ) -> impl Iterator<Item = &StoredDynamicDataSource> {
         self.data_sources
             .entries
             .iter()
+            .filter(move |(ptr, _)| ptr.number <= at)
             .map(|(_, ds)| ds)
             .flatten()
             .filter(|ds| {
