@@ -503,6 +503,7 @@ impl<'a> Iterator for ClampsByBlockIterator<'a> {
 }
 
 /// A list of entity changes with one group per entity type
+#[derive(Debug)]
 pub struct Sheet {
     pub groups: Vec<RowGroup>,
 }
@@ -557,6 +558,7 @@ impl Sheet {
 }
 
 /// Data sources data grouped by block
+#[derive(Debug)]
 pub struct DataSources {
     pub entries: Vec<(BlockPtr, Vec<StoredDynamicDataSource>)>,
 }
@@ -622,6 +624,7 @@ impl<'a> From<&'a EntityMod> for EntityOp<'a> {
 /// to be changed to persist the output of mappings up to a certain block.
 /// For now, a batch will only contain changes for a single block, but will
 /// eventually contain data for multiple blocks.
+#[derive(Debug)]
 pub struct Batch {
     /// The last block for which this batch contains changes
     pub block_ptr: BlockPtr,
