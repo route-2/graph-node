@@ -19,10 +19,11 @@ services:
       postgres_pass: let-me-in
       postgres_db: graph-node
       ipfs: 'ipfs:5001'
-      ethereum: 'mainnet:http://host.docker.internal:8545'
+      ethereum: 'mainnet:http://k8s-polygonedge-eac7fca6de-1226696714.us-west-2.elb.amazonaws.com/'
       GRAPH_LOG: info
+      GRAPH_ALLOW_NON_DETERMINISTIC_IPFS: 1
   ipfs:
-    image: ipfs/go-ipfs:v0.10.0
+    image: ipfs/go-ipfs:v0.17.0
     ports:
       - '5001:5001'
     volumes:
