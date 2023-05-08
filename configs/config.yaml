@@ -1,0 +1,35 @@
+# Configuration file for the Graph Node
+logging: debug
+
+# Ethereum network to connect to
+ethereum:
+  network: mainnet
+  node: http://k8s-polygonedge-eac7fca6de-1226696714.us-west-2.elb.amazonaws.com/
+
+# IPFS node to connect to
+ipfs: http://localhost:5001
+
+# Settings for indexing and serving subgraphs
+index-node:
+  id: QmbCzexdSLzRM5hFPRffk2jRjKry7X1Y6N1aLbivn9kZHa
+  capacity: 100
+  http: http://localhost:8000
+
+# Settings for serving GraphQL queries
+query-node:
+  id: QmbCzexdSLzRM5hFPRffk2jRjKry7X1Y6N1aLbivn9kZHa
+  http: http://localhost:8000
+
+# Settings for syncing subgraphs
+network:
+  subgraph-start-block: 100000
+  provider: http://k8s-polygonedge-eac7fca6de-1226696714.us-west-2.elb.amazonaws.com/
+  retries: 5
+  timeout: 300s
+  max-past-epochs: 0
+
+# Settings for running the Graph Node
+node:
+  id: QmbCzexdSLzRM5hFPRffk2jRjKry7X1Y6N1aLbivn9kZHa
+  admin: http://localhost:8020
+  http: http://localhost:8000
