@@ -78,18 +78,7 @@ pub struct EthereumAdapter {
 // See also f0af4ab0-6b7c-4b68-9141-5b79346a5f61.
 const ETH_CALL_GAS: u32 = 50_000_000;
 
-impl CheapClone for EthereumAdapter {
-    fn cheap_clone(&self) -> Self {
-        Self {
-            logger: self.logger.clone(),
-            provider: self.provider.clone(),
-            web3: self.web3.cheap_clone(),
-            metrics: self.metrics.cheap_clone(),
-            supports_eip_1898: self.supports_eip_1898,
-            call_only: self.call_only,
-        }
-    }
-}
+impl CheapClone for EthereumAdapter {}
 
 impl EthereumAdapter {
     pub fn is_call_only(&self) -> bool {

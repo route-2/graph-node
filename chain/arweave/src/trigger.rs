@@ -52,14 +52,7 @@ pub enum ArweaveTrigger {
     Transaction(Arc<TransactionWithBlockPtr>),
 }
 
-impl CheapClone for ArweaveTrigger {
-    fn cheap_clone(&self) -> ArweaveTrigger {
-        match self {
-            ArweaveTrigger::Block(block) => ArweaveTrigger::Block(block.cheap_clone()),
-            ArweaveTrigger::Transaction(tx) => ArweaveTrigger::Transaction(tx.cheap_clone()),
-        }
-    }
-}
+impl CheapClone for ArweaveTrigger {}
 
 impl PartialEq for ArweaveTrigger {
     fn eq(&self, other: &Self) -> bool {

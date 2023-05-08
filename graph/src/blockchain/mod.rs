@@ -350,14 +350,7 @@ pub struct HostFn {
     pub func: Arc<dyn Send + Sync + Fn(HostFnCtx, u32) -> Result<u32, HostExportError>>,
 }
 
-impl CheapClone for HostFn {
-    fn cheap_clone(&self) -> Self {
-        HostFn {
-            name: self.name,
-            func: self.func.cheap_clone(),
-        }
-    }
-}
+impl CheapClone for HostFn {}
 
 pub trait RuntimeAdapter<C: Blockchain>: Send + Sync {
     fn host_fns(&self, ds: &C::DataSource) -> Result<Vec<HostFn>, Error>;

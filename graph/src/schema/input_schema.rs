@@ -36,13 +36,7 @@ pub struct Inner {
     pool: Arc<AtomPool>,
 }
 
-impl CheapClone for InputSchema {
-    fn cheap_clone(&self) -> Self {
-        InputSchema {
-            inner: self.inner.cheap_clone(),
-        }
-    }
-}
+impl CheapClone for InputSchema {}
 
 impl InputSchema {
     fn create(schema: Schema) -> Self {

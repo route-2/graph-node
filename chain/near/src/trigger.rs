@@ -55,14 +55,7 @@ pub enum NearTrigger {
     Receipt(Arc<ReceiptWithOutcome>),
 }
 
-impl CheapClone for NearTrigger {
-    fn cheap_clone(&self) -> NearTrigger {
-        match self {
-            NearTrigger::Block(block) => NearTrigger::Block(block.cheap_clone()),
-            NearTrigger::Receipt(receipt) => NearTrigger::Receipt(receipt.cheap_clone()),
-        }
-    }
-}
+impl CheapClone for NearTrigger {}
 
 impl PartialEq for NearTrigger {
     fn eq(&self, other: &Self) -> bool {

@@ -41,15 +41,7 @@ struct IpfsServiceInner {
     timeout: Duration,
 }
 
-impl CheapClone for IpfsServiceInner {
-    fn cheap_clone(&self) -> Self {
-        Self {
-            client: self.client.cheap_clone(),
-            max_file_size: self.max_file_size,
-            timeout: self.timeout,
-        }
-    }
-}
+impl CheapClone for IpfsServiceInner {}
 
 impl IpfsServiceInner {
     async fn call_inner(self, req: CidFile) -> Result<Option<Bytes>, Error> {
