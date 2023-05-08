@@ -10,6 +10,7 @@ use crate::components::store::{EntityKey, EntityType, LoadRelatedRequest};
 use crate::data::graphql::ext::DirectiveFinder;
 use crate::data::graphql::{DirectiveExt, DocumentExt, ObjectTypeExt, TypeExt, ValueExt};
 use crate::data::store::{self, scalar, IntoEntityIterator, TryIntoEntityIterator};
+use crate::data::subgraph::schema::POI_DIGEST;
 use crate::prelude::q::Value;
 use crate::prelude::{s, DeploymentHash};
 use crate::schema::api_schema;
@@ -81,6 +82,18 @@ impl InputSchema {
         let schema = Schema::parse(raw, id)?;
 
         Ok(Self::create(schema))
+    }
+
+    /// Convenience for tests to construct an `InputSchema`
+    ///
+    /// # Panics
+    ///
+    /// If the `document` or `hash` can not be successfully converted
+    #[cfg(debug_assertions)]
+    #[track_caller]
+    pub fn raw(document: &str, hash: &str) -> Self {
+        let hash = DeploymentHash::new(hash).unwrap();
+        Self::parse(document, hash).unwrap()
     }
 
     /// Generate the `ApiSchema` for use with GraphQL queries for this
@@ -311,10 +324,7 @@ impl InputSchema {
 /// in the document and the names of all their fields
 fn atom_pool(document: &s::Document) -> AtomPool {
     let mut pool = AtomPool::new();
-    // These two entries are always required
-    pool.intern("g$parent_id"); // Used by queries
-    pool.intern("__typename"); // Mandated by GraphQL
-    pool.intern("digest"); // Attribute of PoI object
+    pool.intern(POI_DIGEST.as_str()); // Attribute of PoI object
     for definition in &document.definitions {
         match definition {
             s::Definition::TypeDefinition(typedef) => match typedef {

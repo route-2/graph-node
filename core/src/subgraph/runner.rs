@@ -12,6 +12,7 @@ use graph::components::{
     subgraph::{MappingError, PoICausalityRegion, ProofOfIndexing, SharedProofOfIndexing},
 };
 use graph::data::store::scalar::Bytes;
+use graph::data::subgraph::schema::POI_DIGEST;
 use graph::data::subgraph::{
     schema::{SubgraphError, SubgraphHealth, POI_OBJECT},
     SubgraphFeature,
@@ -1028,6 +1029,23 @@ async fn update_proof_of_indexing(
     stopwatch: &StopwatchMetrics,
     entity_cache: &mut EntityCache,
 ) -> Result<(), Error> {
+    // Helper to store the digest as a PoI entity in the cache
+    fn store_poi_entity(
+        entity_cache: &mut EntityCache,
+        key: EntityKey,
+        digest: Bytes,
+    ) -> Result<(), Error> {
+        let data = vec![
+            (
+                graph::data::store::ID.clone(),
+                Value::from(key.entity_id.to_string()),
+            ),
+            (POI_DIGEST.clone(), Value::from(digest)),
+        ];
+        let poi = entity_cache.make_entity(data)?;
+        entity_cache.set(key, poi)
+    }
+
     let _section_guard = stopwatch.start_section("update_proof_of_indexing");
 
     let mut proof_of_indexing = proof_of_indexing.take();
@@ -1050,7 +1068,7 @@ async fn update_proof_of_indexing(
         let prev_poi = entity_cache
             .get(&entity_key, GetScope::Store)
             .map_err(Error::from)?
-            .map(|entity| match entity.get("digest") {
+            .map(|entity| match entity.get(POI_DIGEST.as_str()) {
                 Some(Value::Bytes(b)) => b.clone(),
                 _ => panic!("Expected POI entity to have a digest and for it to be bytes"),
             });
@@ -1061,13 +1079,7 @@ async fn update_proof_of_indexing(
 
         // Put this onto an entity with the same digest attribute
         // that was expected before when reading.
-        let new_poi_entity = entity! {
-            entity_cache.schema =>
-            id: entity_key.entity_id.to_string(),
-            digest: updated_proof_of_indexing,
-        }?;
-
-        entity_cache.set(entity_key, new_poi_entity)?;
+        store_poi_entity(entity_cache, entity_key, updated_proof_of_indexing)?;
     }
 
     Ok(())

@@ -53,7 +53,7 @@ use crate::{
 use graph::components::store::{DerivedEntityQuery, EntityKey, EntityType};
 use graph::data::graphql::ext::{DirectiveFinder, ObjectTypeExt};
 use graph::data::store::BYTES_SCALAR;
-use graph::data::subgraph::schema::{POI_OBJECT, POI_TABLE};
+use graph::data::subgraph::schema::{POI_DIGEST, POI_OBJECT, POI_TABLE};
 use graph::prelude::{
     anyhow, info, BlockNumber, DeploymentHash, Entity, EntityChange, EntityOperation, Logger,
     QueryExecutionError, StoreError, StoreEvent, ValueType, BLOCK_NUMBER_MAX,
@@ -394,8 +394,8 @@ impl Layout {
             name: table_name,
             columns: vec![
                 Column {
-                    name: SqlName::from("digest"),
-                    field: "digest".to_owned(),
+                    name: SqlName::from(POI_DIGEST.as_str()),
+                    field: POI_DIGEST.to_string(),
                     field_type: q::Type::NonNullType(Box::new(q::Type::NamedType(
                         BYTES_SCALAR.to_owned(),
                     ))),
@@ -521,7 +521,7 @@ impl Layout {
         FindQuery::new(table.as_ref(), key, block)
             .get_result::<EntityData>(conn)
             .optional()?
-            .map(|entity_data| entity_data.deserialize_with_layout(self, None, true))
+            .map(|entity_data| entity_data.deserialize_with_layout(self, None))
             .transpose()
     }
 
@@ -549,11 +549,11 @@ impl Layout {
         let mut entities: BTreeMap<EntityKey, Entity> = BTreeMap::new();
         for data in query.load::<EntityData>(conn)? {
             let entity_type = data.entity_type();
-            let entity_data: Entity = data.deserialize_with_layout(self, None, true)?;
+            let entity_data: Entity = data.deserialize_with_layout(self, None)?;
 
             let key = EntityKey {
                 entity_type,
-                entity_id: entity_data.id()?.into(),
+                entity_id: entity_data.id(),
                 causality_region: CausalityRegion::from_entity(&entity_data),
             };
             let overwrite = entities.insert(key, entity_data).is_some();
@@ -578,10 +578,10 @@ impl Layout {
 
         for data in query.load::<EntityData>(conn)? {
             let entity_type = data.entity_type();
-            let entity_data: Entity = data.deserialize_with_layout(self, None, true)?;
+            let entity_data: Entity = data.deserialize_with_layout(self, None)?;
             let key = EntityKey {
                 entity_type,
-                entity_id: entity_data.id()?.into(),
+                entity_id: entity_data.id(),
                 causality_region: CausalityRegion::from_entity(&entity_data),
             };
 
@@ -614,8 +614,8 @@ impl Layout {
 
         for entity_data in inserts_or_updates.into_iter() {
             let entity_type = entity_data.entity_type();
-            let data: Entity = entity_data.deserialize_with_layout(self, None, true)?;
-            let entity_id = Word::from(data.id().expect("Invalid ID for entity."));
+            let data: Entity = entity_data.deserialize_with_layout(self, None)?;
+            let entity_id = data.id();
             processed_entities.insert((entity_type.clone(), entity_id.clone()));
 
             changes.push(EntityOperation::Set {
@@ -789,7 +789,7 @@ impl Layout {
             .into_iter()
             .map(|entity_data| {
                 entity_data
-                    .deserialize_with_layout(self, parent_type.as_ref(), false)
+                    .deserialize_with_layout(self, parent_type.as_ref())
                     .map_err(|e| e.into())
             })
             .collect::<Result<Vec<T>, _>>()

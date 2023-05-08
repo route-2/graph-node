@@ -3,6 +3,7 @@ use diesel::connection::SimpleConnection as _;
 use diesel::pg::PgConnection;
 use graph::components::store::EntityKey;
 use graph::data::store::scalar;
+use graph::data::value::Word;
 use graph::data_source::CausalityRegion;
 use graph::entity;
 use graph::prelude::{EntityQuery, MetricsRegistry};
@@ -42,6 +43,9 @@ const THINGS_GQL: &str = "
 
 lazy_static! {
     static ref THINGS_SUBGRAPH_ID: DeploymentHash = DeploymentHash::new("things").unwrap();
+    static ref THINGS_SCHEMA: InputSchema =
+        InputSchema::parse(THINGS_GQL, THINGS_SUBGRAPH_ID.clone())
+            .expect("Failed to parse THINGS_GQL");
     static ref LARGE_INT: BigInt = BigInt::from(std::i64::MAX).pow(17).unwrap();
     static ref LARGE_DECIMAL: BigDecimal =
         BigDecimal::from(1) / BigDecimal::new(LARGE_INT.clone(), 1);
@@ -54,7 +58,7 @@ lazy_static! {
     static ref BYTES_VALUE3: H256 = H256::from(hex!(
         "977c084229c72a0fa377cae304eda9099b6a2cb5d83b25cdf0f0969b69874255"
     ));
-    static ref BEEF_ENTITY: Entity = entity! {
+    static ref BEEF_ENTITY: Entity = entity! { THINGS_SCHEMA =>
         id: scalar::Bytes::from_str("deadbeef").unwrap(),
         name: "Beef",
     };
@@ -76,7 +80,7 @@ fn remove_test_data(conn: &PgConnection) {
 }
 
 fn insert_entity(conn: &PgConnection, layout: &Layout, entity_type: &str, entity: Entity) {
-    let key = EntityKey::data(entity_type.to_owned(), entity.id().unwrap());
+    let key = EntityKey::data(entity_type.to_owned(), entity.id());
 
     let entity_type = EntityType::from(entity_type);
     let mut entities = vec![(&key, Cow::from(&entity))];
@@ -100,8 +104,7 @@ fn insert_thing(conn: &PgConnection, layout: &Layout, id: &str, name: &str) {
         entity! { layout.input_schema =>
             id: id,
             name: name
-        }
-        .unwrap(),
+        },
     );
 }
 
@@ -296,9 +299,9 @@ fn update() {
         // Update the entity
         let mut entity = BEEF_ENTITY.clone();
         entity.set("name", "Moo").unwrap();
-        let key = EntityKey::data("Thing".to_owned(), entity.id().unwrap());
+        let key = EntityKey::data("Thing".to_owned(), entity.id());
 
-        let entity_id = entity.id().unwrap();
+        let entity_id = entity.id();
         let entity_type = key.entity_type.clone();
         let mut entities = vec![(&key, Cow::from(&entity))];
         layout
@@ -372,34 +375,29 @@ fn make_thing_tree(conn: &PgConnection, layout: &Layout) -> (Entity, Entity, Ent
         id: ROOT,
         name: "root",
         children: vec!["babe01", "babe02"]
-    }
-    .unwrap();
+    };
     let child1 = entity! { layout.input_schema =>
         id: CHILD1,
         name: "child1",
         parent: "dead00",
         children: vec![GRANDCHILD1]
-    }
-    .unwrap();
+    };
     let child2 = entity! { layout.input_schema =>
         id: CHILD2,
         name: "child2",
         parent: "dead00",
         children: vec![GRANDCHILD1]
-    }
-    .unwrap();
+    };
     let grand_child1 = entity! { layout.input_schema =>
         id: GRANDCHILD1,
         name: "grandchild1",
         parent: CHILD1
-    }
-    .unwrap();
+    };
     let grand_child2 = entity! { layout.input_schema =>
         id: GRANDCHILD2,
         name: "grandchild2",
         parent: CHILD2
-    }
-    .unwrap();
+    };
 
     insert_entity(conn, layout, "Thing", root.clone());
     insert_entity(conn, layout, "Thing", child1.clone());
@@ -411,7 +409,7 @@ fn make_thing_tree(conn: &PgConnection, layout: &Layout) -> (Entity, Entity, Ent
 
 #[test]
 fn query() {
-    fn fetch(conn: &PgConnection, layout: &Layout, coll: EntityCollection) -> Vec<String> {
+    fn fetch(conn: &PgConnection, layout: &Layout, coll: EntityCollection) -> Vec<Word> {
         let id = DeploymentHash::new("QmXW3qvxV7zXnwRntpj7yoK8HZVtaraZ67uMqaLRvXdxha").unwrap();
         let query = EntityQuery::new(id, BLOCK_NUMBER_MAX, coll).first(10);
         layout
@@ -419,7 +417,7 @@ fn query() {
             .map(|(entities, _)| entities)
             .expect("the query succeeds")
             .into_iter()
-            .map(|e| e.id().expect("entities have an id"))
+            .map(|e| e.id())
             .collect::<Vec<_>>()
     }
 

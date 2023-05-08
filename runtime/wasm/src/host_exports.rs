@@ -156,7 +156,7 @@ impl<C: Blockchain> HostExports<C> {
         proof_of_indexing: &SharedProofOfIndexing,
         entity_type: String,
         entity_id: String,
-        data: HashMap<Word, Value>,
+        mut data: HashMap<Word, Value>,
         stopwatch: &StopwatchMetrics,
         gas: &GasCounter,
     ) -> Result<(), HostExportError> {
@@ -181,6 +181,34 @@ impl<C: Blockchain> HostExports<C> {
         self.check_entity_type_access(&key.entity_type)?;
 
         gas.consume_host_fn(gas::STORE_SET.with_args(complexity::Linear, (&key, &data)))?;
+
+        fn check_id(key: &EntityKey, prev_id: &str) -> Result<(), anyhow::Error> {
+            if prev_id != key.entity_id.as_str() {
+                Err(anyhow!(
+                    "Value of {} attribute 'id' conflicts with ID passed to `store.set()`: \
+                {} != {}",
+                    key.entity_type,
+                    prev_id,
+                    key.entity_id,
+                ))
+            } else {
+                Ok(())
+            }
+        }
+
+        // Set the id if there isn't one yet, and make sure that a
+        // previously set id agrees with the one in the `key`
+        match data.get(&store::ID) {
+            Some(Value::String(s)) => check_id(&key, s)?,
+            Some(Value::Bytes(b)) => check_id(&key, &b.to_string())?,
+            Some(_) => {
+                // The validation will catch the type mismatch
+            }
+            None => {
+                let value = state.entity_cache.schema.id_value(&key)?;
+                data.insert(store::ID.clone(), value);
+            }
+        }
 
         let entity = state
             .entity_cache
@@ -860,6 +888,64 @@ fn bytes_to_string(logger: &Logger, bytes: Vec<u8>) -> String {
     s.trim_end_matches('\u{0000}').to_string()
 }
 
+/// Expose some host functions for testing only
+#[cfg(debug_assertions)]
+pub mod test_support {
+    use std::{collections::HashMap, sync::Arc};
+
+    use graph::{
+        blockchain::Blockchain,
+        components::{store::GetScope, subgraph::SharedProofOfIndexing},
+        data::value::Word,
+        prelude::{BlockState, Entity, StopwatchMetrics, Value},
+        runtime::{gas::GasCounter, HostExportError},
+        slog::Logger,
+    };
+
+    use crate::MappingContext;
+
+    pub struct HostExports<C: Blockchain>(Arc<super::HostExports<C>>);
+
+    impl<C: Blockchain> HostExports<C> {
+        pub fn new(ctx: &MappingContext<C>) -> Self {
+            HostExports(ctx.host_exports.clone())
+        }
+
+        pub fn store_set(
+            &self,
+            logger: &Logger,
+            state: &mut BlockState<C>,
+            proof_of_indexing: &SharedProofOfIndexing,
+            entity_type: String,
+            entity_id: String,
+            data: HashMap<Word, Value>,
+            stopwatch: &StopwatchMetrics,
+            gas: &GasCounter,
+        ) -> Result<(), HostExportError> {
+            self.0.store_set(
+                logger,
+                state,
+                proof_of_indexing,
+                entity_type,
+                entity_id,
+                data,
+                stopwatch,
+                gas,
+            )
+        }
+
+        pub fn store_get(
+            &self,
+            state: &mut BlockState<C>,
+            entity_type: String,
+            entity_id: String,
+            gas: &GasCounter,
+        ) -> Result<Option<Entity>, anyhow::Error> {
+            self.0
+                .store_get(state, entity_type, entity_id, gas, GetScope::Store)
+        }
+    }
+}
 #[test]
 fn test_string_to_h160_with_0x() {
     assert_eq!(

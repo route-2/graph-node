@@ -1,4 +1,5 @@
 use graph::blockchain::block_stream::FirehoseCursor;
+use graph::data::value::Word;
 use graph::schema::InputSchema;
 use graph_store_postgres::command_support::OnSync;
 use lazy_static::lazy_static;
@@ -12,8 +13,8 @@ use graph::components::store::{
 use graph::data::store::scalar;
 use graph::data::subgraph::schema::*;
 use graph::data::subgraph::*;
-use graph::prelude::*;
 use graph::semver::Version;
+use graph::{entity, prelude::*};
 use graph_store_postgres::{Shard, SubgraphStore as DieselSubgraphStore};
 
 const USER_GQL: &str = "
@@ -242,7 +243,7 @@ fn create_test_entity(
     favorite_color: Option<&str>,
 ) -> EntityOperation {
     let bin_name = scalar::Bytes::from_str(&hex::encode(name)).unwrap();
-    let test_entity = entity! {
+    let test_entity = entity! { TEST_SUBGRAPH_SCHEMA =>
         id: id,
         name: name,
         bin_name: bin_name,
@@ -280,7 +281,7 @@ async fn create_grafted_subgraph(
 fn find_entities(
     store: &DieselSubgraphStore,
     deployment: &DeploymentLocator,
-) -> (Vec<Entity>, Vec<String>) {
+) -> (Vec<Entity>, Vec<Word>) {
     let query = EntityQuery::new(
         deployment.hash.clone(),
         BLOCK_NUMBER_MAX,
@@ -297,7 +298,7 @@ fn find_entities(
 
     let ids = entities
         .iter()
-        .map(|entity| entity.id().unwrap())
+        .map(|entity| entity.id())
         .collect::<Vec<_>>();
     (entities, ids)
 }
@@ -555,7 +556,7 @@ fn prune() {
             .find(query)
             .unwrap()
             .into_iter()
-            .map(|entity| entity.id().unwrap())
+            .map(|entity| entity.id())
             .collect();
         assert_eq!(
             act, exp,
